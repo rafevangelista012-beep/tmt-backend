@@ -1,4 +1,7 @@
+if (!user.active) continue;
+
 try {
+
   const exchange = new ccxt.okx({
     apiKey: user.apiKey,
     secret: user.secret,
@@ -17,7 +20,7 @@ try {
   const lows = candles.map(c => c[3]);
   const closes = candles.map(c => c[4]);
 
-  // ===== TREND (STRUCTURE) =====
+  // ===== TREND =====
   const bullishTrend =
     highs[highs.length - 1] > highs[highs.length - 5] &&
     lows[lows.length - 1] > lows[lows.length - 5];
@@ -39,7 +42,7 @@ try {
   const rs = gains / (losses || 1);
   const rsi = 100 - (100 / (1 + rs));
 
-  // ===== STRATEGY (CONFLUENCE) =====
+  // ===== STRATEGY =====
   const validTrade =
     bullishTrend &&
     nearSupport &&
@@ -50,14 +53,11 @@ try {
     continue;
   }
 
-  // ===== SMART SL =====
+  // ===== SL =====
   const stopLoss = support;
   const riskPerUnit = price - stopLoss;
 
-  if (riskPerUnit <= 0) {
-    console.log(`⚠️ Invalid SL`);
-    continue;
-  }
+  if (riskPerUnit <= 0) continue;
 
   // ===== TP =====
   const takeProfit = price + (riskPerUnit * RR);
@@ -66,22 +66,17 @@ try {
   const riskAmount = user.capital * RISK_PERCENT;
   const amount = riskAmount / riskPerUnit;
 
-  if (amount <= 0) {
-    console.log(`⚠️ Invalid amount`);
-    continue;
-  }
+  if (amount <= 0) continue;
 
-  // ===== LOG =====
-  console.log(`🔥 TRADE SIGNAL (${user.email})`);
+  console.log(`🔥 SIGNAL (${user.email})`);
   console.log(`Entry: ${price}`);
   console.log(`SL: ${stopLoss}`);
   console.log(`TP: ${takeProfit}`);
-  console.log(`Amount: ${amount}`);
 
-  // ===== EXECUTE TRADE =====
+  // ===== EXECUTE =====
   const order = await exchange.createMarketBuyOrder(symbol, amount);
 
-  console.log(`✅ TRADE EXECUTED: ${order.id}`);
+  console.log(`✅ EXECUTED: ${order.id}`);
 
 } catch (err) {
   console.log(`❌ ERROR (${user.email}):`, err.message);
