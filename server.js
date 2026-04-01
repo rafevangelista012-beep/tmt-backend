@@ -4,47 +4,131 @@ const ccxt = require('ccxt');
 const app = express();
 app.use(express.json());
 
-// SETTINGS
+// ===== SETTINGS =====
 const RISK_PERCENT = 0.02;
-const TP_PERCENT = 0.03;
-const SL_PERCENT = 0.01;
+const RR_RATIO = 2;
 
-// OKX ONLY
-const okx = new ccxt.okx({ enableRateLimit: true });
-
-// ROOT (IMPORTANT)
-app.get('/', (req, res) => {
-  res.send("TMT AI Backend is LIVE 🚀");
+// ===== OKX =====
+const okx = new ccxt.okx({
+  enableRateLimit: true,
+  // lagyan mo later pag live na:
+  // apiKey: process.env.OKX_API_KEY,
+  // secret: process.env.OKX_SECRET,
+  // password: process.env.OKX_PASSWORD,
 });
 
-// SIGNAL
-app.get('/signal', async (req, res) => {
+// ===== ROOT =====
+app.get('/', (req, res) => {
+  res.send("🤖 TMT SMART BOT LIVE 🚀");
+});
+
+// ===== TRADE =====
+app.get('/trade', async (req, res) => {
   try {
-    const ticker = await okx.fetchTicker('BTC/USDT');
+    const symbol = 'BTC/USDT';
+
+    // ===== PRICE =====
+    const ticker = await okx.fetchTicker(symbol);
     const price = ticker.last;
 
-    const usdt = 10;
-    const amount = (usdt * RISK_PERCENT) / price;
+    // ===== CANDLES =====
+    const candles = await okx.fetchOHLCV(symbol, '5m', undefined, 50);
 
-    const stopLoss = price * (1 - SL_PERCENT);
-    const takeProfit = price * (1 + TP_PERCENT);
+    const closes = candles.map(c => c[4]);
+    const lows = candles.map(c => c[3]);
 
+    // ===== EMA FUNCTION =====
+    function ema(data, period) {
+      let k = 2 / (period + 1);
+      let emaVal = data[0];
+
+      for (let i = 1; i < data.length; i++) {
+        emaVal = data[i] * k + emaVal * (1 - k);
+      }
+      return emaVal;
+    }
+
+    // ===== EMA =====
+    const ema50 = ema(closes, 50);
+    const ema200 = ema(closes, 200);
+
+    // ===== RSI =====
+    let gains = 0;
+    let losses = 0;
+
+    for (let i = 1; i < closes.length; i++) {
+      let diff = closes[i] - closes[i - 1];
+      if (diff > 0) gains += diff;
+      else losses -= diff;
+    }
+
+    const rs = gains / (losses || 1);
+    const rsi = 100 - (100 / (1 + rs));
+
+    // ===== STRATEGY =====
+    let buySignal = false;
+
+    if (price > ema200 && price > ema50 && rsi > 50) {
+      buySignal = true;
+    }
+
+    if (!buySignal) {
+      return res.json({
+        status: "NO TRADE",
+        price,
+        ema50,
+        ema200,
+        rsi
+      });
+    }
+
+    // ===== SMART SL =====
+    const swingLow = Math.min(...lows);
+    const stopLoss = swingLow;
+
+    const riskPerUnit = price - stopLoss;
+
+    if (riskPerUnit <= 0) {
+      return res.json({
+        status: "SKIP",
+        reason: "Invalid SL"
+      });
+    }
+
+    // ===== TP =====
+    const takeProfit = price + (riskPerUnit * RR_RATIO);
+
+    // ===== POSITION SIZE =====
+    const capital = 10;
+    const riskAmount = capital * RISK_PERCENT;
+    const amount = riskAmount / riskPerUnit;
+
+    // ===== RESULT =====
     res.json({
+      status: "BUY SIGNAL",
       exchange: "okx",
-      price,
+      entry: price,
       SL: stopLoss,
       TP: takeProfit,
-      amount
+      amount,
+      rsi,
+      ema50,
+      ema200
     });
+
+    // ===== AUTO TRADE (ENABLE LATER) =====
+    /*
+    await okx.createMarketBuyOrder(symbol, amount);
+    */
 
   } catch (err) {
     res.json({ error: err.message });
   }
 });
 
-// PORT FIX (CRITICAL)
+// ===== PORT =====
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log("Server running on port " + PORT);
+  console.log("🚀 BOT RUNNING on port " + PORT);
 });
