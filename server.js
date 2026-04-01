@@ -11,7 +11,7 @@ try {
 
   const symbol = 'BTC/USDT';
 
-  // ===== FETCH DATA =====
+  // ===== GET DATA =====
   const candles = await exchange.fetchOHLCV(symbol, '5m', undefined, 50);
   const ticker = await exchange.fetchTicker(symbol);
   const price = ticker.last;
@@ -20,12 +20,20 @@ try {
   const lows = candles.map(c => c[3]);
   const closes = candles.map(c => c[4]);
 
-  // ===== TREND =====
-  const bullishTrend =
-    highs[highs.length - 1] > highs[highs.length - 5] &&
-    lows[lows.length - 1] > lows[lows.length - 5];
+  // ===== STRUCTURE (TREND) =====
+  const lastHigh = highs[highs.length - 1];
+  const prevHigh = highs[highs.length - 5];
 
-  // ===== SUPPORT =====
+  const lastLow = lows[lows.length - 1];
+  const prevLow = lows[lows.length - 5];
+
+  const bullishTrend = lastHigh > prevHigh && lastLow > prevLow;
+
+  // ===== LIQUIDITY SWEEP =====
+  const recentLow = Math.min(...lows.slice(-10));
+  const liquiditySweep = price > recentLow;
+
+  // ===== SUPPORT ZONE =====
   const support = Math.min(...lows.slice(-20));
   const nearSupport = price <= support * 1.01;
 
@@ -42,36 +50,39 @@ try {
   const rs = gains / (losses || 1);
   const rsi = 100 - (100 / (1 + rs));
 
-  // ===== STRATEGY =====
+  // ===== FINAL CONFLUENCE =====
   const validTrade =
     bullishTrend &&
+    liquiditySweep &&
     nearSupport &&
     rsi > 50;
 
   if (!validTrade) {
-    console.log(`⛔ NO TRADE for ${user.email}`);
+    console.log(`⛔ NO TRADE (${user.email})`);
     continue;
   }
 
-  // ===== SL =====
+  // ===== SMART SL =====
   const stopLoss = support;
   const riskPerUnit = price - stopLoss;
 
   if (riskPerUnit <= 0) continue;
 
-  // ===== TP =====
-  const takeProfit = price + (riskPerUnit * RR);
+  // ===== SMART TP =====
+  const takeProfit = price + (riskPerUnit * 2);
 
   // ===== POSITION SIZE =====
-  const riskAmount = user.capital * RISK_PERCENT;
+  const riskAmount = user.capital * 0.02;
   const amount = riskAmount / riskPerUnit;
 
   if (amount <= 0) continue;
 
-  console.log(`🔥 SIGNAL (${user.email})`);
+  // ===== LOG =====
+  console.log(`🔥 TRADE (${user.email})`);
   console.log(`Entry: ${price}`);
   console.log(`SL: ${stopLoss}`);
   console.log(`TP: ${takeProfit}`);
+  console.log(`RSI: ${rsi}`);
 
   // ===== EXECUTE =====
   const order = await exchange.createMarketBuyOrder(symbol, amount);
