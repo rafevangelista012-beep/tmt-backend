@@ -52,6 +52,8 @@ app.get('/signal', async (req, res) => {
   res.json(results);
 });
 
-app.listen(10000, () => {
-  console.log("🚀 BOT RUNNING");
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("🚀 BOT RUNNING on port " + PORT);
 });
