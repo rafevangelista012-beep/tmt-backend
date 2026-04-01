@@ -1,22 +1,57 @@
-const express = require("express");
-const cors = require("cors");
+const express = require('express');
+const ccxt = require('ccxt');
 
 const app = express();
-app.use(cors());
+app.use(express.json());
 
-app.get("/", (req, res) => {
-  res.send("TMT AI Backend is LIVE 🚀");
+const RISK_PERCENT = 0.02;
+const TP_PERCENT = 0.03;
+const SL_PERCENT = 0.01;
+
+const binance = new ccxt.binance({ enableRateLimit: true });
+const bybit = new ccxt.bybit({ enableRateLimit: true });
+const okx = new ccxt.okx({ enableRateLimit: true });
+
+const exchanges = [binance, bybit, okx];
+
+app.get('/signal', async (req, res) => {
+
+  const signal = {
+    pair: "BTC/USDT",
+    bias: "BULLISH"
+  };
+
+  let results = [];
+
+  for (let exchange of exchanges) {
+    try {
+      const ticker = await exchange.fetchTicker(signal.pair);
+      const price = ticker.last;
+
+      const usdt = 10;
+      const amount = (usdt * RISK_PERCENT) / price;
+
+      const stopLoss = price * (1 - SL_PERCENT);
+      const takeProfit = price * (1 + TP_PERCENT);
+
+      results.push({
+        exchange: exchange.id,
+        price,
+        SL: stopLoss,
+        TP: takeProfit
+      });
+
+    } catch (err) {
+      results.push({
+        exchange: exchange.id,
+        error: err.message
+      });
+    }
+  }
+
+  res.json(results);
 });
 
-app.get("/signal", (req, res) => {
-  res.json({
-    pair: "BTCUSDT",
-    bias: "BULLISH",
-    confidence: 70,
-    reason: "RSI + MACD bullish confluence"
-  });
-});
-
-app.listen(3000, () => {
-  console.log("Server running on port 3000");
+app.listen(10000, () => {
+  console.log("🚀 BOT RUNNING");
 });
