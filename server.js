@@ -9,8 +9,8 @@ app.use(express.json());
 
 // ===== SUPABASE =====
 const supabase = createClient(
-  'PASTE_YOUR_SUPABASE_URL_HERE',
-  'PASTE_YOUR_SERVICE_ROLE_KEY_HERE'
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 // ===== ADD USER =====
