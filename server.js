@@ -1,135 +1,88 @@
-const express = require('express');
-const ccxt = require('ccxt');
+try {
+  const exchange = new ccxt.okx({
+    apiKey: user.apiKey,
+    secret: user.secret,
+    password: user.password,
+    enableRateLimit: true
+  });
 
-const app = express();
-app.use(express.json());
+  const symbol = 'BTC/USDT';
 
-// SETTINGS
-const RISK_PERCENT = 0.02;
-const RR_RATIO = 2;
+  // ===== FETCH DATA =====
+  const candles = await exchange.fetchOHLCV(symbol, '5m', undefined, 50);
+  const ticker = await exchange.fetchTicker(symbol);
+  const price = ticker.last;
 
-// OKX
-const okx = new ccxt.okx({
-  enableRateLimit: true,
-});
+  const highs = candles.map(c => c[2]);
+  const lows = candles.map(c => c[3]);
+  const closes = candles.map(c => c[4]);
 
-// ROOT
-app.get('/', (req, res) => {
-  res.send("🔥 SMC SMART BOT LIVE 🚀");
-});
+  // ===== TREND (STRUCTURE) =====
+  const bullishTrend =
+    highs[highs.length - 1] > highs[highs.length - 5] &&
+    lows[lows.length - 1] > lows[lows.length - 5];
 
-// TRADE
-app.get('/trade', async (req, res) => {
-  try {
-    const symbol = 'BTC/USDT';
+  // ===== SUPPORT =====
+  const support = Math.min(...lows.slice(-20));
+  const nearSupport = price <= support * 1.01;
 
-    // ===== PRICE =====
-    const ticker = await okx.fetchTicker(symbol);
-    const price = ticker.last;
+  // ===== RSI =====
+  let gains = 0;
+  let losses = 0;
 
-    // ===== CANDLES =====
-    const candles = await okx.fetchOHLCV(symbol, '5m', undefined, 50);
-
-    const highs = candles.map(c => c[2]);
-    const lows = candles.map(c => c[3]);
-    const closes = candles.map(c => c[4]);
-
-    // ===== STRUCTURE =====
-    const lastHigh = highs[highs.length - 1];
-    const prevHigh = highs[highs.length - 5];
-
-    const lastLow = lows[lows.length - 1];
-    const prevLow = lows[lows.length - 5];
-
-    const bullishTrend = lastHigh > prevHigh && lastLow > prevLow;
-
-    // ===== LIQUIDITY SWEEP =====
-    const sweepLow = Math.min(...lows.slice(-10));
-    const liquiditySweep = price > sweepLow;
-
-    // ===== SUPPORT ZONE =====
-    const support = Math.min(...lows.slice(-20));
-    const nearSupport = price <= support * 1.01;
-
-    // ===== RSI =====
-    let gains = 0;
-    let losses = 0;
-
-    for (let i = 1; i < closes.length; i++) {
-      let diff = closes[i] - closes[i - 1];
-      if (diff > 0) gains += diff;
-      else losses -= diff;
-    }
-
-    const rs = gains / (losses || 1);
-    const rsi = 100 - (100 / (1 + rs));
-
-    // ===== FINAL CONFLUENCE =====
-    let buySignal = false;
-
-    if (
-      bullishTrend &&
-      liquiditySweep &&
-      nearSupport &&
-      rsi > 50
-    ) {
-      buySignal = true;
-    }
-
-    if (!buySignal) {
-      return res.json({
-        status: "NO TRADE",
-        reason: "No confluence",
-        bullishTrend,
-        liquiditySweep,
-        nearSupport,
-        rsi
-      });
-    }
-
-    // ===== SMART SL =====
-    const stopLoss = support;
-
-    const riskPerUnit = price - stopLoss;
-
-    if (riskPerUnit <= 0) {
-      return res.json({ status: "SKIP", reason: "Invalid SL" });
-    }
-
-    // ===== TP (LIQUIDITY / RR) =====
-    const takeProfit = price + (riskPerUnit * RR_RATIO);
-
-    // ===== POSITION SIZE =====
-    const capital = 10;
-    const riskAmount = capital * RISK_PERCENT;
-    const amount = riskAmount / riskPerUnit;
-
-    // ===== RESULT =====
-    res.json({
-      status: "BUY SIGNAL 🔥",
-      entry: price,
-      SL: stopLoss,
-      TP: takeProfit,
-      amount,
-      rsi,
-      bullishTrend,
-      liquiditySweep,
-      nearSupport
-    });
-
-    // ===== AUTO TRADE (ENABLE LATER) =====
-    /*
-    await okx.createMarketBuyOrder(symbol, amount);
-    */
-
-  } catch (err) {
-    res.json({ error: err.message });
+  for (let i = 1; i < closes.length; i++) {
+    let diff = closes[i] - closes[i - 1];
+    if (diff > 0) gains += diff;
+    else losses -= diff;
   }
-});
 
-// PORT
-const PORT = process.env.PORT || 3000;
+  const rs = gains / (losses || 1);
+  const rsi = 100 - (100 / (1 + rs));
 
-app.listen(PORT, () => {
-  console.log("🚀 SMC BOT RUNNING on port " + PORT);
-});
+  // ===== STRATEGY (CONFLUENCE) =====
+  const validTrade =
+    bullishTrend &&
+    nearSupport &&
+    rsi > 50;
+
+  if (!validTrade) {
+    console.log(`⛔ NO TRADE for ${user.email}`);
+    continue;
+  }
+
+  // ===== SMART SL =====
+  const stopLoss = support;
+  const riskPerUnit = price - stopLoss;
+
+  if (riskPerUnit <= 0) {
+    console.log(`⚠️ Invalid SL`);
+    continue;
+  }
+
+  // ===== TP =====
+  const takeProfit = price + (riskPerUnit * RR);
+
+  // ===== POSITION SIZE =====
+  const riskAmount = user.capital * RISK_PERCENT;
+  const amount = riskAmount / riskPerUnit;
+
+  if (amount <= 0) {
+    console.log(`⚠️ Invalid amount`);
+    continue;
+  }
+
+  // ===== LOG =====
+  console.log(`🔥 TRADE SIGNAL (${user.email})`);
+  console.log(`Entry: ${price}`);
+  console.log(`SL: ${stopLoss}`);
+  console.log(`TP: ${takeProfit}`);
+  console.log(`Amount: ${amount}`);
+
+  // ===== EXECUTE TRADE =====
+  const order = await exchange.createMarketBuyOrder(symbol, amount);
+
+  console.log(`✅ TRADE EXECUTED: ${order.id}`);
+
+} catch (err) {
+  console.log(`❌ ERROR (${user.email}):`, err.message);
+}
