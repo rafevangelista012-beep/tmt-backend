@@ -16,6 +16,12 @@ try {
   const ticker = await exchange.fetchTicker(symbol);
   const price = ticker.last;
 
+  // ❗ SAFETY CHECK
+  if (!candles || candles.length < 20) {
+    console.log("⚠️ Not enough data");
+    continue;
+  }
+
   const highs = candles.map(c => c[2]);
   const lows = candles.map(c => c[3]);
   const closes = candles.map(c => c[4]);
@@ -66,7 +72,10 @@ try {
   const stopLoss = support;
   const riskPerUnit = price - stopLoss;
 
-  if (riskPerUnit <= 0) continue;
+  if (riskPerUnit <= 0) {
+    console.log("⚠️ Invalid SL");
+    continue;
+  }
 
   // ===== SMART TP =====
   const takeProfit = price + (riskPerUnit * 2);
@@ -75,7 +84,10 @@ try {
   const riskAmount = user.capital * 0.02;
   const amount = riskAmount / riskPerUnit;
 
-  if (amount <= 0) continue;
+  if (amount <= 0 || !isFinite(amount)) {
+    console.log("⚠️ Invalid amount");
+    continue;
+  }
 
   // ===== LOG =====
   console.log(`🔥 TRADE (${user.email})`);
