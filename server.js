@@ -174,6 +174,7 @@ app.get('/trades', async (req, res) => {
     }
 
     res.json(data);
+
   } catch (err) {
     console.log("❌ SERVER ERROR:", err.message);
     res.status(500).json({ error: err.message });
@@ -184,6 +185,8 @@ app.get('/', (req, res) => {
   res.send("TMT BOT RUNNING 🚀");
 });
 
-app.listen(3000, () => {
-  console.log("Server running...");
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("Server running on port " + PORT);
 });
