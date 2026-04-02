@@ -173,7 +173,6 @@ app.get('/trades', async (req, res) => {
       return res.status(500).json({ error });
     }
 
-    // ✅ SUCCESS RESPONSE (IMPORTANT)
     return res.json(data);
 
   } catch (err) {
