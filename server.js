@@ -151,6 +151,14 @@ await supabase.from('trades').insert([
 }, 60000);
 
 // ===== STATUS =====
+app.get('/trades', async (req, res) => {
+  const { data } = await supabase
+    .from('trades')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  res.json(data);
+});
 app.get('/', (req, res) => {
   res.send("TMT BOT RUNNING 🚀");
 });
