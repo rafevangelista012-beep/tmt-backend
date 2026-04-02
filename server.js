@@ -38,10 +38,20 @@ app.post('/add-user', async (req, res) => {
 
 // ===== BOT LOOP =====
 setInterval(async () => {
-  const { data: users } = await supabase
-    .from('users')
-    .select('*')
-    .eq('active', true);
+  const { data: users, error } = await supabase
+  .from('users')
+  .select('*')
+  .eq('active', true);
+
+if (error) {
+  console.log("❌ USER FETCH ERROR:", error);
+  return;
+}
+
+if (!users || users.length === 0) {
+  console.log("⚠️ No users found");
+  return;
+}
 
     for (let user of users) {
   try {
@@ -152,13 +162,24 @@ await supabase.from('trades').insert([
 
 // ===== STATUS =====
 app.get('/trades', async (req, res) => {
-  const { data } = await supabase
-    .from('trades')
-    .select('*')
-    .order('created_at', { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from('trades')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  res.json(data);
+    if (error) {
+      console.log("❌ FETCH ERROR:", error);
+      return res.status(500).json({ error });
+    }
+
+    res.json(data);
+  } catch (err) {
+    console.log("❌ SERVER ERROR:", err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
+
 app.get('/', (req, res) => {
   res.send("TMT BOT RUNNING 🚀");
 });
