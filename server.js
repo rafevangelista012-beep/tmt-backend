@@ -173,8 +173,6 @@ app.get('/trades', async (req, res) => {
       return res.status(500).json({ error });
     }
 
-    res.json(data);
-
   } catch (err) {
     console.log("❌ SERVER ERROR:", err.message);
     res.status(500).json({ error: err.message });
