@@ -43,14 +43,22 @@ setInterval(async () => {
     .select('*')
     .eq('active', true);
 
-  for (let user of users) {
-    try {
-      const exchange = new ccxt.okx({
-        apiKey: user.api_key,
-        secret: user.secret,
-        password: user.password,
-        enableRateLimit: true
-      });
+    for (let user of users) {
+  try {
+    const now = new Date();
+
+    // ❌ STOP if trial expired
+    if (!user.is_paid && new Date(user.trial_end) < now) {
+      console.log(`❌ Trial expired for ${user.email}`);
+      continue;
+    }
+
+    const exchange = new ccxt.okx({
+      apiKey: user.api_key,
+      secret: user.secret,
+      password: user.password,
+      enableRateLimit: true
+    });
 
       const symbol = 'BTC/USDT';
 
