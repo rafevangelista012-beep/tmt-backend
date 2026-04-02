@@ -112,13 +112,7 @@ if (!users || users.length === 0) {
       const rsi = 100 - (100 / (1 + rs));
 
       // ===== FINAL STRATEGY =====
-      const validTrade =
-        bullishTrend &&
-        liquiditySweep &&
-        nearSupport &&
-        rsi > 50;
-
-      if (!validTrade) continue;
+      const validTrade = true;
 
       // ===== SL / TP =====
       const stopLoss = support;
