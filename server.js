@@ -128,7 +128,20 @@ setInterval(async () => {
       console.log(`SL: ${stopLoss}`);
       console.log(`TP: ${takeProfit}`);
 
-      await exchange.createMarketBuyOrder(symbol, amount);
+      const order = await exchange.createMarketBuyOrder(symbol, amount);
+
+// 💾 SAVE TRADE
+await supabase.from('trades').insert([
+  {
+    email: user.email,
+    symbol,
+    entry: price,
+    stop_loss: stopLoss,
+    take_profit: takeProfit,
+    side: 'BUY',
+    status: 'OPEN'
+  }
+]);
 
     } catch (err) {
       console.log(`❌ ERROR ${user.email}`, err.message);
